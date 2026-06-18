@@ -1,64 +1,88 @@
-import Image from "next/image";
+import Link from "next/link";
+import {
+  getSubjectLabel,
+  getSubjects,
+  groupSubjectsByGrade,
+} from "@/lib/subjects";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  let subjects: Awaited<ReturnType<typeof getSubjects>> = [];
+  let error: string | null = null;
+
+  try {
+    subjects = await getSubjects();
+  } catch (err) {
+    error =
+      err instanceof Error
+        ? err.message
+        : "Unable to load subjects. Check your Firebase configuration.";
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-full bg-gradient-to-b from-slate-50 to-slate-100">
+      <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-widest text-indigo-600">
+              Matric Unlocked
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-900">Subjects</h1>
+          </div>
+          <span className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700">
+            {subjects.length} available
+          </span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl px-6 py-10">
+        {error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-5 text-red-800">
+            <p className="font-medium">Failed to load subjects</p>
+            <p className="mt-1 text-sm text-red-700">{error}</p>
+          </div>
+        ) : subjects.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+            <p className="text-lg font-medium text-slate-900">No subjects yet</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Add documents to the <code className="rounded bg-slate-100 px-1.5 py-0.5">subjects</code>{" "}
+              collection in Firebase to see them here.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-10">
+            {groupSubjectsByGrade(subjects).map((group) => (
+              <section key={group.grade}>
+                <div className="mb-4 flex items-baseline justify-between gap-4">
+                  <h2 className="text-xl font-semibold text-slate-900">{group.label}</h2>
+                  <span className="text-sm text-slate-500">
+                    {group.subjects.length} subject{group.subjects.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.subjects.map((subject) => (
+                    <li key={subject.id}>
+                      <Link
+                        href={`/subjects/${subject.id}`}
+                        className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-200 hover:shadow-md"
+                      >
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          {getSubjectLabel(subject)}
+                        </h3>
+                        {subject.description ? (
+                          <p className="mt-2 text-sm leading-6 text-slate-600">
+                            {subject.description}
+                          </p>
+                        ) : null}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
