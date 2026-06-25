@@ -1,18 +1,21 @@
+import { adminDb } from "./firebase-admin";
+import type { ExamPeriod, Topic } from "./topic-utils";
+import { getTopicLabel } from "./topic-utils";
 import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  updateDoc,
-  where,
-  writeBatch,
-} from "firebase/firestore";
-import { db } from "./firebase";
-import { getFirebaseStoragePublicUrl } from "./firebase-storage-url";
-import type { ExamPeriod, Topic } from "./topics";
-import { getTopicLabel } from "./topics";
+  buildQuestionImageStoragePath,
+  getQuestionImageUrl,
+  hasAssignedQuestionImage,
+  isFirebaseStorageImagePath,
+  isValidQuestionImageStoragePath,
+} from "./question-utils";
+
+export {
+  buildQuestionImageStoragePath,
+  getQuestionImageUrl,
+  hasAssignedQuestionImage,
+  isFirebaseStorageImagePath,
+  isValidQuestionImageStoragePath,
+} from "./question-utils";
 
 export interface Question {
   id: string;
@@ -63,14 +66,12 @@ export async function getQuestionsForSubjectAndExam(
   exam: ExamPeriod,
 ): Promise<Question[]> {
   const terms = getTermsForExam(exam);
-  const snapshot = await getDocs(
-    query(
-      collection(db, "questions"),
-      where("name", "==", subjectName),
-      where("grade", "==", grade),
-      where("term", "in", terms),
-    ),
-  );
+  const snapshot = await adminDb
+    .collection("questions")
+    .where("name", "==", subjectName)
+    .where("grade", "==", grade)
+    .where("term", "in", terms)
+    .get();
 
   return snapshot.docs.map((doc) => ({
     id: doc.id,
@@ -82,13 +83,11 @@ export async function getQuestionsForSubjectAndGrade(
   subjectName: string,
   grade: number,
 ): Promise<Question[]> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, "questions"),
-      where("name", "==", subjectName),
-      where("grade", "==", grade),
-    ),
-  );
+  const snapshot = await adminDb
+    .collection("questions")
+    .where("name", "==", subjectName)
+    .where("grade", "==", grade)
+    .get();
 
   return snapshot.docs.map((doc) => ({
     id: doc.id,
@@ -100,13 +99,11 @@ export async function deleteQuestionsForSubject(
   subjectName: string,
   grade: number,
 ): Promise<number> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, "questions"),
-      where("name", "==", subjectName),
-      where("grade", "==", grade),
-    ),
-  );
+  const snapshot = await adminDb
+    .collection("questions")
+    .where("name", "==", subjectName)
+    .where("grade", "==", grade)
+    .get();
 
   if (snapshot.empty) return 0;
 
@@ -114,7 +111,7 @@ export async function deleteQuestionsForSubject(
   const batchSize = 500;
 
   for (let start = 0; start < docs.length; start += batchSize) {
-    const batch = writeBatch(db);
+    const batch = adminDb.batch();
     const chunk = docs.slice(start, start + batchSize);
     for (const questionDoc of chunk) {
       batch.delete(questionDoc.ref);
@@ -137,8 +134,8 @@ export function hasBeenImageChecked(question: Question): boolean {
 }
 
 export async function getQuestionById(questionId: string): Promise<Question | null> {
-  const snapshot = await getDoc(doc(db, "questions", questionId));
-  if (!snapshot.exists()) return null;
+  const snapshot = await adminDb.collection("questions").doc(questionId).get();
+  if (!snapshot.exists) return null;
 
   return {
     id: snapshot.id,
@@ -147,11 +144,11 @@ export async function getQuestionById(questionId: string): Promise<Question | nu
 }
 
 export async function deleteQuestionById(questionId: string): Promise<void> {
-  await deleteDoc(doc(db, "questions", questionId));
+  await adminDb.collection("questions").doc(questionId).delete();
 }
 
 export async function getAllQuestions(): Promise<Question[]> {
-  const snapshot = await getDocs(collection(db, "questions"));
+  const snapshot = await adminDb.collection("questions").get();
   return snapshot.docs
     .map((questionDoc) => ({
       id: questionDoc.id,
@@ -182,11 +179,6 @@ export function countQuestionsMissingImagePathBySubject(
   }
 
   return counts;
-}
-
-export function hasAssignedQuestionImage(imagePath: string | null | undefined): boolean {
-  const trimmed = imagePath?.trim();
-  return Boolean(trimmed && trimmed !== "image_required");
 }
 
 export function hasUsableQuestionImage(imagePath: string | null | undefined): boolean {
@@ -256,13 +248,12 @@ export async function bulkAssignQuestionImagePath(
   }
 
   const batchSize = 500;
-
   for (let start = 0; start < toUpdate.length; start += batchSize) {
-    const batch = writeBatch(db);
+    const batch = adminDb.batch();
     const chunk = toUpdate.slice(start, start + batchSize);
 
     for (const question of chunk) {
-      batch.update(doc(db, "questions", question.id), {
+      batch.update(adminDb.collection("questions").doc(question.id), {
         image_path: trimmedPath,
         image_check: "done",
       });
@@ -278,14 +269,14 @@ export async function updateQuestionImagePath(
   questionId: string,
   imagePath: string,
 ): Promise<void> {
-  await updateDoc(doc(db, "questions", questionId), {
+  await adminDb.collection("questions").doc(questionId).update({
     image_path: imagePath,
     image_check: "done",
   });
 }
 
 export async function clearQuestionImagePath(questionId: string): Promise<void> {
-  await updateDoc(doc(db, "questions", questionId), {
+  await adminDb.collection("questions").doc(questionId).update({
     image_path: "",
   });
 }
@@ -302,13 +293,12 @@ export async function clearQuestionImagesForPaper(
   if (toClear.length === 0) return 0;
 
   const batchSize = 500;
-
   for (let start = 0; start < toClear.length; start += batchSize) {
-    const batch = writeBatch(db);
+    const batch = adminDb.batch();
     const chunk = toClear.slice(start, start + batchSize);
 
     for (const question of chunk) {
-      batch.update(doc(db, "questions", question.id), {
+      batch.update(adminDb.collection("questions").doc(question.id), {
         image_path: "",
       });
     }
@@ -320,7 +310,7 @@ export async function clearQuestionImagesForPaper(
 }
 
 export async function markQuestionImageCheckDone(questionId: string): Promise<void> {
-  await updateDoc(doc(db, "questions", questionId), {
+  await adminDb.collection("questions").doc(questionId).update({
     image_check: "done",
   });
 }
@@ -329,7 +319,7 @@ export async function updateQuestionSubTopic(
   questionId: string,
   subTopic: string,
 ): Promise<void> {
-  await updateDoc(doc(db, "questions", questionId), {
+  await adminDb.collection("questions").doc(questionId).update({
     subTopic,
   });
 }
@@ -338,7 +328,7 @@ export async function updateQuestionNumber(
   questionId: string,
   questionNumber: string,
 ): Promise<void> {
-  await updateDoc(doc(db, "questions", questionId), {
+  await adminDb.collection("questions").doc(questionId).update({
     questionNumber,
     questionNumberUpdatedAt: new Date().toISOString(),
   });
@@ -352,7 +342,7 @@ export async function updateQuestionReadyStatus(
   questionId: string,
   ready: boolean,
 ): Promise<void> {
-  await updateDoc(doc(db, "questions", questionId), {
+  await adminDb.collection("questions").doc(questionId).update({
     ready,
     readyUpdatedAt: new Date().toISOString(),
   });
@@ -419,13 +409,12 @@ export async function markQuestionsReadyForPaper(
 
   const now = new Date().toISOString();
   const batchSize = 500;
-
   for (let start = 0; start < questions.length; start += batchSize) {
-    const batch = writeBatch(db);
+    const batch = adminDb.batch();
     const chunk = questions.slice(start, start + batchSize);
 
     for (const question of chunk) {
-      batch.update(doc(db, "questions", question.id), {
+      batch.update(adminDb.collection("questions").doc(question.id), {
         ready: true,
         readyUpdatedAt: now,
       });
@@ -441,7 +430,7 @@ export async function saveQuestionAiExplanation(
   questionId: string,
   explanation: string,
 ): Promise<void> {
-  await updateDoc(doc(db, "questions", questionId), {
+  await adminDb.collection("questions").doc(questionId).update({
     aiExplanation: explanation,
     aiExplanationUpdatedAt: new Date().toISOString(),
   });
@@ -647,15 +636,13 @@ export async function getQuestionsForPaper(
   term: number,
   year: number,
 ): Promise<Question[]> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, "questions"),
-      where("name", "==", subjectName),
-      where("grade", "==", grade),
-      where("term", "==", term),
-      where("year", "==", year),
-    ),
-  );
+  const snapshot = await adminDb
+    .collection("questions")
+    .where("name", "==", subjectName)
+    .where("grade", "==", grade)
+    .where("term", "==", term)
+    .where("year", "==", year)
+    .get();
 
   return sortQuestionsByNumber(
     snapshot.docs.map((questionDoc) => ({
@@ -690,42 +677,4 @@ export function formatQuestionOptions(options: unknown): string[] {
   }
 
   return [String(value)];
-}
-
-export function isFirebaseStorageImagePath(imagePath: string): boolean {
-  return (
-    imagePath.startsWith("question-images/") ||
-    /^past-papers\/q-[^/]+\//.test(imagePath)
-  );
-}
-
-export function getQuestionImageUrl(imagePath: string | null | undefined): string | null {
-  const trimmed = imagePath?.trim();
-  if (!trimmed || trimmed === "image_required") return null;
-
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    return trimmed;
-  }
-
-  if (isFirebaseStorageImagePath(trimmed)) {
-    return getFirebaseStoragePublicUrl(trimmed);
-  }
-
-  return `/question-images/${trimmed}`;
-}
-
-export function buildQuestionImageStoragePath(questionId: string, fileName: string): string {
-  const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/-+/g, "-");
-  return `past-papers/${questionId}/${sanitized}`;
-}
-
-export function isValidQuestionImageStoragePath(
-  imagePath: string,
-  questionId: string,
-): boolean {
-  const trimmed = imagePath.trim();
-  return (
-    trimmed.startsWith(`past-papers/${questionId}/`) ||
-    trimmed.startsWith(`question-images/${questionId}/`)
-  );
 }

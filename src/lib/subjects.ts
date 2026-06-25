@@ -1,5 +1,4 @@
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
-import { db } from "./firebase";
+import { adminDb } from "./firebase-admin";
 
 export interface Subject {
   id: string;
@@ -86,7 +85,7 @@ export function getSubjectLabel(subject: Subject): string {
 }
 
 export async function getSubjects(): Promise<Subject[]> {
-  const snapshot = await getDocs(collection(db, "subjects"));
+  const snapshot = await adminDb.collection("subjects").get();
 
   return snapshot.docs
     .map((doc) => ({
@@ -97,8 +96,8 @@ export async function getSubjects(): Promise<Subject[]> {
 }
 
 export async function getSubjectById(id: string): Promise<Subject | null> {
-  const snapshot = await getDoc(doc(db, "subjects", id));
-  if (!snapshot.exists()) return null;
+  const snapshot = await adminDb.collection("subjects").doc(id).get();
+  if (!snapshot.exists) return null;
 
   const subject = {
     id: snapshot.id,
@@ -109,15 +108,11 @@ export async function getSubjectById(id: string): Promise<Subject | null> {
 }
 
 export async function getSubjectsByName(name: string, grade?: number): Promise<Subject[]> {
-  const snapshot = await getDocs(
-    grade != null
-      ? query(
-          collection(db, "subjects"),
-          where("name", "==", name),
-          where("grade", "==", grade),
-        )
-      : query(collection(db, "subjects"), where("name", "==", name)),
-  );
+  let queryRef = adminDb.collection("subjects").where("name", "==", name);
+  if (grade != null) {
+    queryRef = queryRef.where("grade", "==", grade);
+  }
+  const snapshot = await queryRef.get();
 
   return snapshot.docs.map((doc) => ({
     id: doc.id,

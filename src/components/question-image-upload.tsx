@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { getQuestionImageUrl, hasAssignedQuestionImage } from "@/lib/questions";
+import { getQuestionImageUrl, hasAssignedQuestionImage } from "@/lib/question-utils";
 import {
   getImageFileFromClipboard,
   uploadQuestionImageToStorage,

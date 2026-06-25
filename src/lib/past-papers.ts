@@ -1,14 +1,6 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  setDoc,
-  where,
-} from "firebase/firestore";
 import { getBytes, ref, uploadBytes, deleteObject } from "firebase/storage";
-import { db, storage } from "./firebase";
+import { adminDb } from "./firebase-admin";
+import { storage } from "./firebase";
 import { getFirebaseStoragePublicUrl } from "./firebase-storage-url";
 import { uploadImageToOpenAi, uploadPdfToOpenAi, validateOpenAiPdfFile } from "./openai-files";
 
@@ -83,8 +75,8 @@ export async function getPastPaperByKey(
   year: number,
 ): Promise<PastPaper | null> {
   const id = buildPastPaperId(subjectId, term, year);
-  const snapshot = await getDoc(doc(db, "past_papers", id));
-  if (!snapshot.exists()) return null;
+  const snapshot = await adminDb.collection("past_papers").doc(id).get();
+  if (!snapshot.exists) return null;
 
   return {
     id: snapshot.id,
@@ -93,9 +85,10 @@ export async function getPastPaperByKey(
 }
 
 export async function getPastPapersForSubject(subjectId: string): Promise<PastPaper[]> {
-  const snapshot = await getDocs(
-    query(collection(db, "past_papers"), where("subjectId", "==", subjectId)),
-  );
+  const snapshot = await adminDb
+    .collection("past_papers")
+    .where("subjectId", "==", subjectId)
+    .get();
 
   return snapshot.docs
     .map((paperDoc) => ({
@@ -108,8 +101,7 @@ export async function getPastPapersForSubject(subjectId: string): Promise<PastPa
 export async function savePastPaperProcessing(
   paper: Omit<PastPaper, "pdfPath" | "openaiFileId" | "pageCount" | "pdfUploadedAt" | "ocrUpdatedAt">,
 ): Promise<void> {
-  await setDoc(
-    doc(db, "past_papers", paper.id),
+  await adminDb.collection("past_papers").doc(paper.id).set(
     {
       ...paper,
       ocrStatus: "processing",
@@ -133,8 +125,7 @@ export async function savePastPaperUpload(
 ): Promise<void> {
   const now = new Date().toISOString();
 
-  await setDoc(
-    doc(db, "past_papers", paperId),
+  await adminDb.collection("past_papers").doc(paperId).set(
     {
       id: paperId,
       subjectId: data.subjectId,
@@ -158,8 +149,7 @@ export async function savePastPaperOpenAiFileId(
   paperId: string,
   openaiFileId: string,
 ): Promise<void> {
-  await setDoc(
-    doc(db, "past_papers", paperId),
+  await adminDb.collection("past_papers").doc(paperId).set(
     {
       openaiFileId,
       ocrUpdatedAt: new Date().toISOString(),
@@ -173,8 +163,7 @@ export async function savePastPaperFailure(
   errorMessage: string,
   partial?: Partial<PastPaper>,
 ): Promise<void> {
-  await setDoc(
-    doc(db, "past_papers", paperId),
+  await adminDb.collection("past_papers").doc(paperId).set(
     {
       ...partial,
       ocrStatus: "failed",
@@ -209,7 +198,7 @@ export async function ensurePastPaperRecord(
     ocrStatus: "none",
   };
 
-  await setDoc(doc(db, "past_papers", paperId), record, { merge: true });
+  await adminDb.collection("past_papers").doc(paperId).set(record, { merge: true });
   return record;
 }
 
@@ -217,14 +206,13 @@ export async function appendPastPaperImages(
   paperId: string,
   newImages: PastPaperImage[],
 ): Promise<PastPaperImage[]> {
-  const snapshot = await getDoc(doc(db, "past_papers", paperId));
-  const existing = snapshot.exists()
+  const snapshot = await adminDb.collection("past_papers").doc(paperId).get();
+  const existing = snapshot.exists
     ? ((snapshot.data() as PastPaper).images ?? [])
     : [];
   const images = [...existing, ...newImages];
 
-  await setDoc(
-    doc(db, "past_papers", paperId),
+  await adminDb.collection("past_papers").doc(paperId).set(
     {
       images,
       ocrUpdatedAt: new Date().toISOString(),
@@ -278,8 +266,7 @@ export async function deleteAllPastPaperImages(
   const paperId = buildPastPaperId(subjectId, term, year);
   await deletePastPaperImagesFromStorage(images);
 
-  await setDoc(
-    doc(db, "past_papers", paperId),
+  await adminDb.collection("past_papers").doc(paperId).set(
     {
       images: [],
       ocrUpdatedAt: new Date().toISOString(),
@@ -339,16 +326,15 @@ export async function savePastPaperImageOpenAiFileId(
   imagePath: string,
   openaiFileId: string,
 ): Promise<void> {
-  const snapshot = await getDoc(doc(db, "past_papers", paperId));
-  if (!snapshot.exists()) return;
+  const snapshot = await adminDb.collection("past_papers").doc(paperId).get();
+  if (!snapshot.exists) return;
 
   const pastPaper = snapshot.data() as PastPaper;
   const images = (pastPaper.images ?? []).map((image) =>
     image.path === imagePath ? { ...image, openaiFileId } : image,
   );
 
-  await setDoc(
-    doc(db, "past_papers", paperId),
+  await adminDb.collection("past_papers").doc(paperId).set(
     {
       images,
       ocrUpdatedAt: new Date().toISOString(),
@@ -391,8 +377,7 @@ function isValidPdfBuffer(pdfBuffer: Buffer): boolean {
 }
 
 export async function clearPastPaperOpenAiFileId(paperId: string): Promise<void> {
-  await setDoc(
-    doc(db, "past_papers", paperId),
+  await adminDb.collection("past_papers").doc(paperId).set(
     {
       openaiFileId: "",
       ocrUpdatedAt: new Date().toISOString(),

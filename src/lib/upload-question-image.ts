@@ -1,7 +1,7 @@
 "use client";
 
 import { ref, uploadBytes } from "firebase/storage";
-import { buildQuestionImageStoragePath } from "./questions";
+import { buildQuestionImageStoragePath } from "./question-utils";
 import { storage } from "./firebase";
 
 const ALLOWED_IMAGE_TYPES = new Set([

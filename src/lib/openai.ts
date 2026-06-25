@@ -539,3 +539,147 @@ export async function generateExplainerVideoScript(
     ),
   );
 }
+
+export interface GenerateQuestionExplanationInput {
+  subject: string;
+  context: string;
+  question: string;
+  options?: unknown;
+  answer: string;
+  topic?: string;
+}
+
+function normalizeOptionsForExplanation(options: unknown): string[] {
+  if (options == null) return [];
+
+  if (typeof options === "string") {
+    try {
+      const parsed = JSON.parse(options) as unknown;
+      return normalizeOptionsForExplanation(parsed);
+    } catch {
+      return options.trim() ? [options] : [];
+    }
+  }
+
+  if (Array.isArray(options)) {
+    return options.map((option) => String(option));
+  }
+
+  if (typeof options === "object") {
+    return Object.values(options as Record<string, unknown>).map((option) => String(option));
+  }
+
+  return [String(options)];
+}
+
+function buildQuestionExplanationPrompt(input: GenerateQuestionExplanationInput): string {
+  const options = normalizeOptionsForExplanation(input.options);
+  const lines = [
+    `Subject: ${input.subject}`,
+    input.topic?.trim() ? `Topic: ${input.topic.trim()}` : null,
+    input.context.trim() ? `Context: ${input.context.trim()}` : null,
+    `Question: ${input.question.trim()}`,
+    options.length > 0 ? `Options: ${options.join(" | ")}` : null,
+    `Correct answer: ${input.answer.trim()}`,
+  ].filter((line): line is string => Boolean(line));
+
+  return lines.join("\n");
+}
+
+export async function generateQuestionExplanation(
+  input: GenerateQuestionExplanationInput,
+): Promise<string> {
+  if (!input.question.trim()) {
+    throw new Error("Question text is required.");
+  }
+  if (!input.answer.trim()) {
+    throw new Error("Answer is required.");
+  }
+
+  return callOpenAiChat([
+    {
+      role: "system",
+      content:
+        "You are an expert South African matric tutor. Write clear, exam-focused explanations that help students understand why the correct answer is right and how to approach similar questions. Always follow the exact markdown format specified in the user message.",
+    },
+    {
+      role: "user",
+      content: `Write a study explanation for the exam question below.
+
+You MUST follow this exact markdown format and use these special characters:
+
+# Understanding [Concept Name]
+
+## [First sub-section heading]
+- **Definition:** ...
+- **Purpose:** ...
+
+## [Second sub-section heading — e.g. why the answer is correct, key points, or advantages]
+1. **Point heading:**
+   - Supporting detail.
+   - Another supporting detail.
+   - Example: ...
+
+2. **Point heading:**
+   - Supporting detail.
+   - Another supporting detail.
+
+(Add more numbered points as needed for the question.)
+
+## Conclusion
+- Summarise the key takeaway and why the correct answer is right.
+
+***Key Lesson:*** One memorable takeaway sentence! 📈✨
+
+Length:
+- Aim for 250–400 words in total — thorough enough to teach the concept, but concise enough to read in under 2 minutes
+- Use 2–3 ## sections (including Conclusion)
+- Include 3–5 numbered points in the main body section for most questions; use fewer (2–3) for simple recall questions and more (up to 6) only when the concept genuinely needs it
+- Write 2–3 supporting bullets under each numbered point; add an Example bullet where it helps
+- Keep the Conclusion to 1–2 bullets
+- Keep ***Key Lesson:*** to a single short sentence
+- Do not pad with filler, repetition, or extra sections just to hit a word count
+
+Formatting rules:
+- Use # for the main title (one only), ## for section headings
+- Use - for bullet points and 1. 2. 3. for numbered lists
+- Use **bold** for labels like **Definition:**, **Purpose:**, and numbered point headings
+- Indent nested bullets with three spaces under numbered items
+- End with exactly one ***Key Lesson:*** line (three asterisks on each side) followed by a relevant emoji
+- Teach the underlying concept, not just restate the answer
+- Explain why the correct answer is correct
+- Briefly note why other options are wrong when options are provided
+- Keep the tone direct, helpful, and exam-focused
+- Do not mention that you are an AI
+
+Example structure (adapt headings and content to the question):
+
+# Understanding Diversification Strategies
+
+## What is Diversification?
+- **Definition:** Diversification is a business strategy that involves expanding into new markets or products to reduce risk and increase sales.
+- **Purpose:** Companies often use this strategy to spread out their investments and resources, preventing reliance on a single product or market.
+
+## Advantages of Diversification Strategies
+1. **Increases Sales:**
+   - By entering new markets or offering new products, companies can attract different customer segments.
+   - More products mean more opportunities to sell, which directly boosts sales revenue.
+   - Example: A clothing brand that starts selling accessories or shoes can cater to more customers.
+
+2. **Reduces Risk:**
+   - Diversification helps mitigate risks. If one sector of the market experiences a downturn, other sectors can still provide revenue.
+   - Rather than facing a total loss, companies can balance their income streams from various products or markets.
+
+## Conclusion
+- The primary advantage of diversification strategies is the significant increase in sales potential.
+
+***Key Lesson:*** Diversification can boost sales significantly by reaching new customers! 📈✨
+
+Question to explain:
+
+${buildQuestionExplanationPrompt(input)}
+
+Return only the explanation markdown.`,
+    },
+  ]);
+}

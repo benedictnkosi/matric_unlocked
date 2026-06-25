@@ -11,6 +11,7 @@
     "seed:questions": "node --env-file=.env.local scripts/seed-questions.mjs",
     "generate:sub-topics": "node --env-file=.env.local --import tsx scripts/generate-sub-topics.ts",
     "generate:video-scripts": "node --env-file=.env.local --import tsx scripts/generate-video-scripts.ts",
+    "generate:question-explanations": "node --env-file=.env.local --import tsx scripts/generate-question-explanations.ts",
     "check:image-required": "node --env-file=.env.local --import tsx scripts/check-image-required.ts",
     "classify:sub-topics": "node --env-file=.env.local --import tsx scripts/classify-question-sub-topics.ts",
     "generate:question-images": "node --env-file=.env.local --import tsx scripts/generate-question-images.ts",
@@ -25,7 +26,8 @@
     "firebase": "^12.15.0",
     "next": "16.2.9",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",
