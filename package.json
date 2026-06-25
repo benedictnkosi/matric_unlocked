@@ -18,7 +18,8 @@
     "delete:subject": "node --env-file=.env.local --import tsx scripts/delete-subject-data.ts",
     "update:question-steps": "node --env-file=.env.local --import tsx scripts/update-question-steps.ts",
     "migrate:firebase": "node --env-file=.env.local --env-file=.env.target.local --import tsx scripts/migrate-firebase-data.ts",
-    "migrate:question-images": "node --env-file=.env.local --env-file=.env.target.local --import tsx scripts/migrate-firebase-data.ts --question-images-only --confirm"
+    "migrate:question-images": "node --env-file=.env.local --env-file=.env.target.local --import tsx scripts/migrate-firebase-data.ts --question-images-only --confirm",
+    "migrate:topic-images": "node --env-file=.env.target.local --import tsx scripts/migrate-topic-images.ts"
   },
   "dependencies": {
     "firebase": "^12.15.0",

@@ -41,6 +41,7 @@ yarn-error.log*
 
 # service account keys for migration scripts
 /secrets/
+matric-unlocked-firebase-adminsdk-fbsvc-17c7bd1818.json
 
 # vercel
 .vercel

@@ -197,7 +197,7 @@ Source project env vars (from .env.local):
 
 Target project env vars (from .env.target.local):
   TARGET_FIREBASE_*
-  TARGET_FIREBASE_SERVICE_ACCOUNT=./secrets/matric-unlocked-service-account.json
+  TARGET_FIREBASE_SERVICE_ACCOUNT=./matric-unlocked-firebase-adminsdk-fbsvc-17c7bd1818.json
 
 Optional source service account (recommended for Storage):
   SOURCE_FIREBASE_SERVICE_ACCOUNT=./secrets/invoice-for-consultants-service-account.json
@@ -220,7 +220,7 @@ Options:
 
 Setup:
   1. Firebase Console -> Project Settings -> Service accounts -> Generate new private key
-  2. Save the JSON key for matric-unlocked under ./secrets/
+  2. Save the JSON key as ./matric-unlocked-firebase-adminsdk-fbsvc-17c7bd1818.json in the project root
   3. Set TARGET_FIREBASE_SERVICE_ACCOUNT in .env.target.local
   4. Re-run with --confirm
 
@@ -412,7 +412,7 @@ function initMigrationClients(options: MigrateOptions): MigrationClients {
     throw new Error(
       "TARGET_FIREBASE_SERVICE_ACCOUNT is required for writes.\n" +
         "Download a service account key from Firebase Console -> Project Settings -> Service accounts,\n" +
-        "save it under ./secrets/, and set TARGET_FIREBASE_SERVICE_ACCOUNT in .env.target.local.",
+        "save it as ./matric-unlocked-firebase-adminsdk-fbsvc-17c7bd1818.json, and set TARGET_FIREBASE_SERVICE_ACCOUNT in .env.target.local.",
     );
   }
 
