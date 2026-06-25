@@ -12,6 +12,7 @@ import {
   startAfter,
   type DocumentData,
   type Firestore as ClientFirestore,
+  type Query,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import {
@@ -286,7 +287,7 @@ async function* paginateClientCollection(
   let lastDoc: QueryDocumentSnapshot<DocumentData> | null = null;
 
   while (true) {
-    const pageQuery = lastDoc
+    const pageQuery: Query<DocumentData> = lastDoc
       ? query(
           collection(db, collectionName),
           orderBy(documentId()),

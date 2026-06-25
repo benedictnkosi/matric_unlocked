@@ -119,7 +119,11 @@ function normalizeField(value: string | null | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, " ");
 }
 
-function matchKey(entry: Pick<StepsEntry, "context" | "question" | "answer">): string {
+function matchKey(entry: {
+  context?: string | null;
+  question?: string | null;
+  answer?: string | null;
+}): string {
   return [
     normalizeField(entry.context),
     normalizeField(entry.question),
