@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from "fs/promises";
+import { tmpdir } from "os";
 import { join } from "path";
 import {
   extractTopicsFromQuestions,
@@ -6,23 +7,18 @@ import {
   type GeneratedTopic,
 } from "./openai";
 import {
-  getQuestionsForSubjectAndExam,
+  getQuestionsForSubjectAndGrade,
+  getQuestionsTaggedWithTopic,
   getTopTopicsByQuestionCount,
   serializeQuestionsForAnalysis,
 } from "./questions";
 import { getSubjectById, getSubjectLabel } from "./subjects";
-import {
-  deleteTopicsForExam,
-  getExamLabel,
-  saveGeneratedTopics,
-  type ExamPeriod,
-} from "./topics";
+import { deleteTopicsForSubject, saveGeneratedTopics } from "./topics";
 
 export interface GenerateTopicsResult {
   questionCount: number;
   topicCount: number;
   jsonFilePath: string;
-  exam: ExamPeriod;
   source: "question-topics" | "ai";
 }
 
@@ -31,7 +27,6 @@ const TOP_TOPICS_LIMIT = 10;
 
 export async function generateTopicsForSubject(
   subjectId: string,
-  exam: ExamPeriod,
 ): Promise<GenerateTopicsResult> {
   const subject = await getSubjectById(subjectId);
   if (!subject) {
@@ -43,15 +38,13 @@ export async function generateTopicsForSubject(
   }
 
   const subjectName = getSubjectLabel(subject);
-  const questions = await getQuestionsForSubjectAndExam(subjectName, subject.grade, exam);
+  const questions = await getQuestionsForSubjectAndGrade(subjectName, subject.grade);
 
   if (questions.length === 0) {
-    throw new Error(
-      `No questions found for ${subjectName} (${getExamLabel(exam)}).`,
-    );
+    throw new Error(`No questions found for ${subjectName} (Grade ${subject.grade}).`);
   }
 
-  const outputDir = join(process.cwd(), "tmp", "generated-questions");
+  const outputDir = join(tmpdir(), "generated-questions");
   await mkdir(outputDir, { recursive: true });
 
   const safeSubjectSlug = subjectName
@@ -60,13 +53,12 @@ export async function generateTopicsForSubject(
     .replace(/^-|-$/g, "");
   const jsonFilePath = join(
     outputDir,
-    `${safeSubjectSlug}-grade-${subject.grade}-${exam}.json`,
+    `${safeSubjectSlug}-grade-${subject.grade}.json`,
   );
 
   const payload = {
     subject: subjectName,
     grade: subject.grade,
-    exam,
     questionCount: questions.length,
     questions: serializeQuestionsForAnalysis(questions),
   };
@@ -75,29 +67,33 @@ export async function generateTopicsForSubject(
 
   const topTopics = getTopTopicsByQuestionCount(questions, TOP_TOPICS_LIMIT);
 
-  let generatedTopics: GeneratedTopic[];
+  let generatedTopics: Array<GeneratedTopic & { questionCount?: number }>;
   let source: GenerateTopicsResult["source"];
 
   if (topTopics.length >= MIN_TAGGED_TOPICS) {
     generatedTopics = topTopics.map((topic) => ({
       name: topic.name,
       description: "",
+      questionCount: topic.questionCount,
     }));
     source = "question-topics";
   } else {
-    generatedTopics = await extractTopicsFromQuestions(
+    const aiTopics = await extractTopicsFromQuestions(
       subjectName,
-      getExamLabel(exam),
+      `Grade ${subject.grade}`,
       prepareQuestionsForPrompt(payload.questions),
     );
+    generatedTopics = aiTopics.map((topic) => ({
+      ...topic,
+      questionCount: getQuestionsTaggedWithTopic(questions, topic.name).length,
+    }));
     source = "ai";
   }
 
-  await deleteTopicsForExam(subjectName, subject.grade, exam);
+  await deleteTopicsForSubject(subjectName, subject.grade);
   await saveGeneratedTopics({
     subject: subjectName,
     grade: subject.grade,
-    exam,
     topics: generatedTopics,
   });
 
@@ -105,7 +101,6 @@ export async function generateTopicsForSubject(
     questionCount: questions.length,
     topicCount: generatedTopics.length,
     jsonFilePath,
-    exam,
     source,
   };
 }

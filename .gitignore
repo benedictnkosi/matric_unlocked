@@ -24,6 +24,11 @@
 .DS_Store
 *.pem
 /tmp/
+questions-with-topics.json.bak
+image-required-progress.jsonl
+sub-topic-classification-progress.jsonl
+question-image-generation-progress.jsonl
+/public/question-images/
 
 # debug
 npm-debug.log*
@@ -33,6 +38,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+
+# service account keys for migration scripts
+/secrets/
 
 # vercel
 .vercel

@@ -31,17 +31,27 @@ function toDocId(index) {
   return `q-${String(index + 1).padStart(6, "0")}`;
 }
 
-function normalizeQuestion(question) {
+function normalizeQuestion(question, index) {
+  const grade = question.grade ?? question.subject_grade;
+  const name = question.name ?? question.subject_name ?? "";
+
+  if (grade == null) {
+    throw new Error(`Question at index ${index} is missing grade/subject_grade.`);
+  }
+
   return {
     context: question.context ?? "",
     question: question.question ?? "",
     options: parseOptions(question.options),
     answer: question.answer ?? "",
     image_path: question.image_path ?? "",
-    term: question.term,
-    name: question.name ?? "",
-    grade: question.grade,
+    term: question.term ?? null,
+    name,
+    grade,
     topic: question.topic ?? "",
+    subTopic: question.subTopic ?? question.sub_topic ?? "",
+    aiExplanation: question.ai_explanation ?? question.aiExplanation ?? "",
+    year: question.year ?? null,
   };
 }
 
@@ -59,7 +69,7 @@ async function seedQuestions() {
 
     for (let i = 0; i < chunk.length; i++) {
       const index = start + i;
-      batch.set(doc(db, "questions", toDocId(index)), normalizeQuestion(chunk[i]));
+      batch.set(doc(db, "questions", toDocId(index)), normalizeQuestion(chunk[i], index));
     }
 
     await batch.commit();

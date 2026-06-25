@@ -4,15 +4,41 @@ import {
   getSubjects,
   groupSubjectsByGrade,
 } from "@/lib/subjects";
+import {
+  countReadyQuestionsBySubject,
+  getAllQuestions,
+  getSubjectQuestionCountKey,
+} from "@/lib/questions";
+import { countTopicsByGrade, countTopicsBySubject, getAllTopics, getSubjectTopicCountKey } from "@/lib/topics";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   let subjects: Awaited<ReturnType<typeof getSubjects>> = [];
+  let topicCountsByGrade = new Map<number, { topicCount: number; subTopicCount: number }>();
+  let topicCountsBySubject = new Map<string, { topicCount: number; subTopicCount: number }>();
+  let readyCountsBySubject = new Map<string, number>();
   let error: string | null = null;
 
   try {
-    subjects = await getSubjects();
+    const [loadedSubjects, allTopics, allQuestions] = await Promise.all([
+      getSubjects(),
+      getAllTopics(),
+      getAllQuestions(),
+    ]);
+    subjects = loadedSubjects;
+    readyCountsBySubject = countReadyQuestionsBySubject(allQuestions);
+
+    const subjectNamesByGrade = new Map<number, Set<string>>();
+    for (const subject of subjects) {
+      const grade = subject.grade ?? 0;
+      const names = subjectNamesByGrade.get(grade) ?? new Set<string>();
+      names.add(getSubjectLabel(subject));
+      subjectNamesByGrade.set(grade, names);
+    }
+
+    topicCountsByGrade = countTopicsByGrade(allTopics, subjectNamesByGrade);
+    topicCountsBySubject = countTopicsBySubject(allTopics);
   } catch (err) {
     error =
       err instanceof Error
@@ -52,16 +78,42 @@ export default async function Home() {
           </div>
         ) : (
           <div className="space-y-10">
-            {groupSubjectsByGrade(subjects).map((group) => (
+            {groupSubjectsByGrade(subjects).map((group) => {
+              const counts = topicCountsByGrade.get(group.grade) ?? {
+                topicCount: 0,
+                subTopicCount: 0,
+              };
+
+              return (
               <section key={group.grade}>
                 <div className="mb-4 flex items-baseline justify-between gap-4">
                   <h2 className="text-xl font-semibold text-slate-900">{group.label}</h2>
-                  <span className="text-sm text-slate-500">
-                    {group.subjects.length} subject{group.subjects.length === 1 ? "" : "s"}
-                  </span>
+                  <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm text-slate-500">
+                    <span>
+                      {group.subjects.length} subject{group.subjects.length === 1 ? "" : "s"}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      {counts.topicCount} topic{counts.topicCount === 1 ? "" : "s"}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      {counts.subTopicCount} sub-topic{counts.subTopicCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
                 </div>
                 <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {group.subjects.map((subject) => (
+                  {group.subjects.map((subject) => {
+                    const subjectCounts =
+                      topicCountsBySubject.get(
+                        getSubjectTopicCountKey(subject.grade ?? 0, getSubjectLabel(subject)),
+                      ) ?? { topicCount: 0, subTopicCount: 0 };
+                    const readyCount =
+                      readyCountsBySubject.get(
+                        getSubjectQuestionCountKey(subject.grade ?? 0, getSubjectLabel(subject)),
+                      ) ?? 0;
+
+                    return (
                     <li key={subject.id}>
                       <Link
                         href={`/subjects/${subject.id}`}
@@ -70,6 +122,15 @@ export default async function Home() {
                         <h3 className="text-lg font-semibold text-slate-900">
                           {getSubjectLabel(subject)}
                         </h3>
+                        <p className="mt-2 text-sm text-slate-500">
+                          {subjectCounts.topicCount} topic
+                          {subjectCounts.topicCount === 1 ? "" : "s"} ·{" "}
+                          {subjectCounts.subTopicCount} sub-topic
+                          {subjectCounts.subTopicCount === 1 ? "" : "s"}
+                        </p>
+                        <p className="mt-2 text-sm text-slate-500">
+                          {readyCount} ready question{readyCount === 1 ? "" : "s"}
+                        </p>
                         {subject.description ? (
                           <p className="mt-2 text-sm leading-6 text-slate-600">
                             {subject.description}
@@ -77,10 +138,12 @@ export default async function Home() {
                         ) : null}
                       </Link>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               </section>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

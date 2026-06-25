@@ -8,7 +8,17 @@
     "start": "next start",
     "lint": "eslint",
     "seed:subjects": "node --env-file=.env.local scripts/seed-subjects.mjs",
-    "seed:questions": "node --env-file=.env.local scripts/seed-questions.mjs"
+    "seed:questions": "node --env-file=.env.local scripts/seed-questions.mjs",
+    "generate:sub-topics": "node --env-file=.env.local --import tsx scripts/generate-sub-topics.ts",
+    "generate:video-scripts": "node --env-file=.env.local --import tsx scripts/generate-video-scripts.ts",
+    "check:image-required": "node --env-file=.env.local --import tsx scripts/check-image-required.ts",
+    "classify:sub-topics": "node --env-file=.env.local --import tsx scripts/classify-question-sub-topics.ts",
+    "generate:question-images": "node --env-file=.env.local --import tsx scripts/generate-question-images.ts",
+    "generate:topic-images": "node --env-file=.env.local --import tsx scripts/generate-topic-images.ts",
+    "delete:subject": "node --env-file=.env.local --import tsx scripts/delete-subject-data.ts",
+    "update:question-steps": "node --env-file=.env.local --import tsx scripts/update-question-steps.ts",
+    "migrate:firebase": "node --env-file=.env.local --env-file=.env.target.local --import tsx scripts/migrate-firebase-data.ts",
+    "migrate:question-images": "node --env-file=.env.local --env-file=.env.target.local --import tsx scripts/migrate-firebase-data.ts --question-images-only --confirm"
   },
   "dependencies": {
     "firebase": "^12.15.0",
@@ -17,13 +27,18 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sharp": "^0.31.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "firebase-admin": "^14.1.0",
+    "sharp": "^0.35.2",
     "tailwindcss": "^4",
+    "tsx": "^4.20.3",
     "typescript": "^5"
   }
 }

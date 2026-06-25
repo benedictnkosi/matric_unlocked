@@ -111,7 +111,7 @@ export function VideoScriptButton({
         </p>
       ) : (
         <p className="mt-2 text-xs text-slate-500">
-          Generates a 420-440 word exam-focused script for {topicName}.
+          Generates an exam-focused script for {topicName}.
         </p>
       )}
 

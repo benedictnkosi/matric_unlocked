@@ -123,6 +123,89 @@ export async function extractTopicsFromQuestions(
     }));
 }
 
+function buildSubTopicExtractionPrompt(
+  parentTopicName: string,
+  parentTopicDescription: string,
+  questionsJson: string,
+): string {
+  return `A broad exam topic is too large for a single 400-word video script and needs to be split into smaller sub-topics.
+
+Parent topic: ${parentTopicName}
+
+Parent topic description:
+${parentTopicDescription}
+
+Below is JSON containing exam questions that belong to this parent topic. Analyse them and decide how many sub-topics are needed to cover as many of these questions as possible.
+
+Each sub-topic must:
+- Be focused enough for a single ~400-word explainer video
+- Have a clear, concise name
+- Include a description of what the student must know and be able to do
+- Cover a distinct slice of the parent topic
+
+Decide the number of sub-topics based on the breadth and depth of the questions. Use as many sub-topics as needed to cover the material well, but no more than necessary. Prefer fewer, well-scoped sub-topics over many overlapping ones.
+
+Return valid JSON in this exact shape:
+{
+  "subTopics": [
+    {
+      "name": "Sub-topic name",
+      "description": "What students must know...",
+      "questionCount": 12
+    }
+  ]
+}
+
+Order sub-topics from most to least important.
+For questionCount, estimate how many questions from the JSON each sub-topic covers.
+
+Questions JSON:
+${questionsJson}`;
+}
+
+export async function extractSubTopicsFromQuestions(
+  parentTopicName: string,
+  parentTopicDescription: string,
+  questionsJson: string,
+): Promise<Array<GeneratedTopic & { questionCount?: number }>> {
+  const content = await callOpenAiChat(
+    [
+      {
+        role: "system",
+        content:
+          "You are an expert South African matric curriculum analyst. Split broad exam topics into focused sub-topics suitable for short explainer videos.",
+      },
+      {
+        role: "user",
+        content: buildSubTopicExtractionPrompt(
+          parentTopicName,
+          parentTopicDescription,
+          questionsJson,
+        ),
+      },
+    ],
+    { json: true },
+  );
+
+  const parsed = JSON.parse(content) as {
+    subTopics?: Array<GeneratedTopic & { questionCount?: number }>;
+  };
+
+  if (!Array.isArray(parsed.subTopics) || parsed.subTopics.length === 0) {
+    throw new Error("OpenAI response did not include any sub-topics.");
+  }
+
+  return parsed.subTopics
+    .filter((topic) => topic.name?.trim() && topic.description?.trim())
+    .map((topic) => ({
+      name: topic.name.trim(),
+      description: topic.description.trim(),
+      ...(typeof topic.questionCount === "number" && topic.questionCount > 0
+        ? { questionCount: topic.questionCount }
+        : {}),
+    }));
+}
+
 const MAX_PROMPT_CHARS = 350_000;
 
 interface PromptQuestion {
@@ -314,21 +397,21 @@ function buildScriptOptimizationPrompt(
 
 You must strictly follow these formatting and content rules:
 
-1. RULE 1: THE HOOK (NO FLUFF). Never start with generic introductions like "Hey guys, welcome back to my channel" or "Today we are looking at..." Instead, hook the viewer instantly with the exact value proposition, focusing on easy marks and the specific topic/paper. Never state a specific number of marks (e.g. do not say "15 marks" or "10 marks"). Use phrasing like "easy marks" instead. (e.g., "Here is how to secure easy marks on Digestibility Coefficient Calculations in Paper 1.")
+1. RULE 1: THE OPENING. Choose an opening that fits the topic and content. Avoid generic introductions like "Hey guys, welcome back to my channel" or "Today we are looking at..." unless they genuinely work for the script.
 
-2. RULE 2: WORD COUNT & PACING. The final script must be around 420-440 words. This needs to perfectly hit a 2-minute video length when read at a fast, high-energy pace of 220 words per minute.
+2. RULE 2: LENGTH & PACING. Choose a script length that fits the topic — as long as needed to cover the exam content well, and as short as possible without leaving out important material. Do not pad to hit a target word count, and do not cut essential explanations just to stay brief.
 
 3. RULE 3: SPEAKING FLOW. Write numbers, percentages, and formulas out clearly so they are natural to read aloud (e.g., use "79 minus 7" or "a ratio of 1 to 10" instead of just raw symbols).
 
 4. RULE 4: GENERAL CONTEXT. Keep the language universally understood. Avoid hyper-local slang, specific region-locked cultural references, or niche TV shows unless explicitly asked. Use globally recognized analogies if explaining a concept.
 
-5. RULE 5: MID-VIDEO MICRO-CTA. Don't wait until the end to ask for engagement. At roughly the halfway point of the script (around the 1-minute / 220-word mark), insert a quick micro-call-to-action that the whiteboard animation can sketch on screen: "Drop a like if this makes sense so far!" Keep it brief and natural so it doesn't break the flow, then immediately continue with the content.
+5. RULE 5: MID-VIDEO MICRO-CTA. Don't wait until the end to ask for engagement. At roughly the halfway point of the script, insert a quick micro-call-to-action that the whiteboard animation can sketch on screen: "Does this make sense so far? Like and share this video to help other students!" Keep it brief and natural so it doesn't break the flow, then immediately continue with the content.
 
 6. STRUCTURE:
-- High-impact hook focused on easy marks and the topic.
+- An opening that fits the topic.
 - Punchy breakdown of the core exam concepts using bullet points/numbered lists for flow.
 - A clear step-by-step example if there is a calculation.
-- A mid-video micro-CTA at roughly the halfway point: "Drop a like if this makes sense so far!"
+- A mid-video micro-CTA at roughly the halfway point: "Does this make sense so far? Like and share this video to help other students!"
 - A rapid-fire recap at the end to lock in the information.
 - Do not end with a subscribe/like call-to-action. End on the recap or a final exam-focused takeaway.
 
@@ -395,7 +478,8 @@ Requirements:
 - Do not be overly friendly or nice
 - Write as a spoken video script the student can follow while studying
 - Cover all key concepts from the matched questions
-- Do not mention specific mark values; refer to "easy marks" instead when talking about scoring
+- Choose a length that fits the material — long enough to teach it properly, without unnecessary padding
+- Open the script in whatever way best suits the topic and matched questions
 
 Matched exam questions:
 ${formatIdentifiedQuestionsForPrompt(questions)}

@@ -1,5 +1,6 @@
 import {
   getQuestionsForSubjectAndExam,
+  getQuestionsForSubjectAndGrade,
   getQuestionsTaggedWithTopic,
   serializeQuestionsForAnalysis,
 } from "./questions";
@@ -25,29 +26,25 @@ export async function generateVideoScriptForTopic(
     throw new Error("Topic not found.");
   }
 
-  if (!topic.subject || topic.grade == null || !topic.exam) {
-    throw new Error("Topic is missing subject, grade, or exam period.");
+  if (!topic.subject || topic.grade == null) {
+    throw new Error("Topic is missing subject or grade.");
   }
 
   const topicName = getTopicLabel(topic);
   const topicDescription =
     topic.description?.trim() || `Key exam concepts for ${topicName}.`;
 
-  const exam = topic.exam === "june-exams" || topic.exam === "final-exams"
-    ? topic.exam
-    : null;
-  if (!exam) {
-    throw new Error("Topic has an invalid exam period.");
-  }
+  const exam =
+    topic.exam === "june-exams" || topic.exam === "final-exams" ? topic.exam : null;
 
-  const questions = await getQuestionsForSubjectAndExam(
-    topic.subject,
-    topic.grade,
-    exam,
-  );
+  const questions = exam
+    ? await getQuestionsForSubjectAndExam(topic.subject, topic.grade, exam)
+    : await getQuestionsForSubjectAndGrade(topic.subject, topic.grade);
+
+  const examLabel = exam ? getExamLabel(exam) : `Grade ${topic.grade}`;
 
   if (questions.length === 0) {
-    throw new Error(`No questions found for ${topic.subject} (${getExamLabel(exam)}).`);
+    throw new Error(`No questions found for ${topic.subject} (${examLabel}).`);
   }
 
   const taggedQuestions = getQuestionsTaggedWithTopic(questions, topicName);
@@ -81,7 +78,7 @@ export async function generateVideoScriptForTopic(
     topicName,
     topic.subject,
     topicDescription,
-    getExamLabel(exam),
+    examLabel,
     identifiedQuestions,
   );
 
